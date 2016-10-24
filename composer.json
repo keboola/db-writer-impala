@@ -1,9 +1,9 @@
 {
-    "name": "keboola/db-writer-mssql",
+    "name": "keboola/db-writer-impala",
     "license": "MIT",
     "type": "project",
-    "description": "Keboola Microsoft SQL DB Writer",
-    "keywords": ["keboola", "microsoft", "sql server", "mssql", "db", "writer"],
+    "description": "Keboola Writer to Cloudera Impala DB",
+    "keywords": ["keboola", "cloudera", "impala", "writer"],
     "authors": [
         {
             "name": "Miroslav Čillík",
@@ -12,10 +12,10 @@
     ],
     "require": {
         "php": ">=5.6",
-        "keboola/db-writer-common": "^0.0"
+        "keboola/db-writer-common": "^2.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "4.6.*",
+        "phpunit/phpunit": "^5.3",
         "squizlabs/php_codesniffer": "^2.6",
         "codeclimate/php-test-reporter": "^0.3"
     },

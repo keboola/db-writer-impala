@@ -12,6 +12,7 @@
 
     <php>
         <const name="ROOT_PATH" value="./"/>
+        <const name="APP_NAME" value="wr-db-impala"/>
     </php>
 
     <testsuite name="Impala Writer Test Suite">

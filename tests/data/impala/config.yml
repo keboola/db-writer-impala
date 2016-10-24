@@ -1,16 +1,17 @@
 parameters:
     db:
-        driver: mssql
-        host: mssql
-        port: 1433
-        database: test
-        user:
+        driver: impala
+        host: impala
+        port: 21050
+        database: default
+        user: root
         password:
+        auth_mech: 0
 
     tables:
         -
             tableId: simple
-            dbName: dbo.simple
+            dbName: simple
             export: 1
             lastChange:
             incremental: true
@@ -26,21 +27,21 @@ parameters:
                 -
                     name: name
                     dbName: name
-                    type: nvarchar
+                    type: varchar
                     size: 255
                     nullable:
                     default:
                 -
                     name: glasses
                     dbName: glasses
-                    type: nvarchar
+                    type: varchar
                     size: 255
                     nullable:
                     default:
 
         -
             tableId: special
-            dbName: dbo.special
+            dbName: special
             export: 1
             lastChange:
             items:

@@ -17,37 +17,20 @@ use Keboola\DbWriter\WriterInterface;
 class Impala extends Writer implements WriterInterface
 {
     private static $allowedTypes = [
-        'int', 'smallint', 'bigint', 'money',
-        'decimal', 'real', 'float',
-        'date', 'datetime', 'datetime2', 'time', 'timestamp',
-        'char', 'varchar', 'text',
-        'nchar', 'nvarchar', 'ntext',
-        'binary', 'varbinary', 'image',
+        'bigint', 'boolean', 'char', 'decimal',
+        'double', 'float', 'int', 'real',
+        'smallint', 'string', 'timestamp',
+        'tinyint', 'varchar'
     ];
-
 
     private static $typesWithSize = [
-        'identity',
-        'decimal', 'float',
-        'datetime', 'time',
-        'char', 'varchar',
-        'nchar', 'nvarchar',
-        'binary', 'varbinary',
-    ];
-
-    private static $unicodeTypes = [
-        'nchar', 'nvarchar', 'ntext',
-    ];
-
-    private static $numericTypes = [
-        'int', 'smallint', 'bigint', 'money',
-        'decimal', 'real', 'float'
+        'char',
+        'decimal',
+        'varchar'
     ];
 
     /** @var \PDO */
     protected $db;
-
-    private $batched = true;
 
     /** @var Logger */
     protected $logger;
@@ -60,12 +43,6 @@ class Impala extends Writer implements WriterInterface
 
     public function createConnection($dbParams)
     {
-        if (!empty($dbParams['batched'])) {
-            if ($dbParams['batched'] == false) {
-                $this->batched = false;
-            }
-        }
-
         // check params
         foreach (['host', 'database', 'user', '#password'] as $r) {
             if (!isset($dbParams[$r])) {
@@ -73,165 +50,42 @@ class Impala extends Writer implements WriterInterface
             }
         }
 
-        $port = isset($dbParams['port']) ? $dbParams['port'] : '1433';
+        // convert errors to PDOExceptions
+        $options = [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+            \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
+        ];
 
-        if ($port == '1433') {
-            $dsn = sprintf(
-                "dblib:host=%s;dbname=%s;charset=UTF-8",
-                $dbParams['host'],
-                $dbParams['database']
-            );
-        } else {
-            $dsn = sprintf(
-                "dblib:host=%s:%s;dbname=%s;charset=UTF-8",
-                $dbParams['host'],
-                $port,
-                $dbParams['database']
-            );
-        }
+        $port = isset($dbParams['port']) ? $dbParams['port'] : '21050';
+        $dsn = sprintf(
+            "odbc:DSN=MyImpala;HOST=%s;PORT=%s;Database=%s;UID=%s;PWD=%s;AuthMech=%s",
+            $dbParams['host'],
+            $port,
+            $dbParams['database'],
+            $dbParams['user'],
+            $dbParams['#password'],
+            isset($dbParams['auth_mech'])?$dbParams['auth_mech']:3
+        );
 
-        // mssql dont support options
-        $pdo = new \PDO($dsn, $dbParams['user'], $dbParams['#password']);
-        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $pdo = new \PDO($dsn, $dbParams['user'], $dbParams['#password'], $options);
+        $pdo->setAttribute(\PDO::ATTR_EMULATE_PREPARES, true);
 
         return $pdo;
     }
 
-    public function write($sourceFilename, array $table)
+    public static function getAllowedTypes()
     {
-        $csv = new CsvFile($sourceFilename);
-
-        // skip the header
-        $csv->next();
-        $csv->next();
-
-        $columnsCount = count($csv->current());
-        $rowsPerInsert = intval((1000 / $columnsCount) - 1);
-
-        $this->db->beginTransaction();
-
-        while ($csv->current() !== false) {
-            $sql = "INSERT INTO " . $this->escape($table['dbName']) . " VALUES ";
-
-            for ($i=0; $i<1 && $csv->current() !== false; $i++) {
-                $sql .= sprintf(
-                    "(%s),",
-                    implode(
-                        ',',
-                        $this->encodeCsvRow(
-                            $this->escapeCsvRow($csv->current()),
-                            $table['items']
-                        )
-                    )
-                );
-                $csv->next();
-            }
-            $sql = substr($sql, 0, -1);
-
-            $this->db->exec($sql);
-        }
-
-        $this->db->commit();
-    }
-
-    private function encodeCsvRow($row, $columnDefinitions)
-    {
-        $res = [];
-        foreach ($row as $k => $v) {
-            if (strtolower($columnDefinitions[$k]['type']) == 'ignore') {
-                continue;
-            }
-            $decider = $this->getEncodingDecider($columnDefinitions[$k]['type']);
-            $res[$k] = $decider($v);
-        }
-
-        return $res;
-    }
-
-    private function getEncodingDecider($type)
-    {
-        return function ($data) use ($type) {
-            if (strtolower($data) === 'null') {
-                return $data;
-            }
-
-            if (in_array(strtolower($type), self::$numericTypes) && empty($data)) {
-                return 0;
-            }
-
-            if (!in_array(strtolower($type), self::$numericTypes)) {
-                $data = "'" . $data . "'";
-            }
-
-            if (in_array(strtolower($type), self::$unicodeTypes)) {
-                return "N" . $data;
-            }
-
-            return $data;
-        };
-    }
-
-    private function escapeCsvRow($row)
-    {
-        $res = [];
-        foreach ($row as $k => $v) {
-            $res[$k] = $this->msEscapeString($v);
-        }
-
-        return $res;
-    }
-
-    private function msEscapeString($data)
-    {
-        if (!isset($data) || empty($data)) {
-            return '';
-        }
-        if (is_numeric($data)) {
-            return $data;
-        }
-
-        $non_displayables = [
-            '/%0[0-8bcef]/',            // url encoded 00-08, 11, 12, 14, 15
-            '/%1[0-9a-f]/',             // url encoded 16-31
-            '/[\x00-\x08]/',            // 00-08
-            '/\x0b/',                   // 11
-            '/\x0c/',                   // 12
-            '/[\x0e-\x1f]/'             // 14-31
-        ];
-        foreach ($non_displayables as $regex) {
-            $data = preg_replace($regex, '', $data);
-        }
-        $data = str_replace("'", "''", $data);
-
-        return $data;
-    }
-
-    public function isTableValid(array $table, $ignoreExport = false)
-    {
-        // TODO: Implement isTableValid() method.
-
-        return true;
+        return self::$allowedTypes;
     }
 
     public function drop($tableName)
     {
-        $this->db->exec(sprintf("IF OBJECT_ID('%s', 'U') IS NOT NULL DROP TABLE %s;", $tableName, $tableName));
-    }
-
-    private function escape($obj)
-    {
-        $objNameArr = explode('.', $obj);
-
-        if (count($objNameArr) > 1) {
-            return $objNameArr[0] . ".[" . $objNameArr[1] . "]";
-        }
-
-        return "[" . $objNameArr[0] . "]";
+        $this->execQuery(sprintf("DROP TABLE IF EXISTS %s", $this->escape($tableName)));
     }
 
     public function create(array $table)
     {
-        $sql = "create table {$this->escape($table['dbName'])} (";
+        $sql = "CREATE TABLE `{$table['dbName']}` (";
 
         $columns = $table['items'];
         foreach ($columns as $k => $col) {
@@ -244,26 +98,39 @@ class Impala extends Writer implements WriterInterface
                 $type .= "({$col['size']})";
             }
 
-            $null = empty($col['nullable']) ? 'NULL' : 'NOT NULL';
-
-            $default = empty($col['default']) ? '' : $col['default'];
-            if ($type == 'text') {
-                $default = '';
-            }
-
-            $sql .= "{$this->escape($col['dbName'])} $type $null $default";
+            $sql .= "`{$col['dbName']}` $type";
             $sql .= ',';
         }
 
         $sql = substr($sql, 0, -1);
-        $sql .= ");";
+        $sql .= ") ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' ESCAPED BY '\\\\'";
 
         $this->execQuery($sql);
     }
 
-    public static function getAllowedTypes()
+
+    public function write(CsvFile $csv, array $table)
     {
-        return self::$allowedTypes;
+        // skip the header
+        $csv->next();
+        $csv->next();
+
+        $columnsCount = count($csv->current());
+        $rowsPerInsert = intval((1000 / $columnsCount) - 1);
+
+        while ($csv->current() !== false) {
+            $sql = sprintf('INSERT INTO %s VALUES ', $this->escape($table['dbName']));
+
+            for ($i=0; $i<$rowsPerInsert && $csv->current() !== false; $i++) {
+                $sql .= sprintf("(%s),", $this->getValuesClause($csv->current(), $table['items']));
+                $csv->next();
+            }
+            // ditch the last coma
+            $sql = substr($sql, 0, -1);
+
+            var_dump($sql);
+            $this->db->exec($sql);
+        }
     }
 
     public function upsert(array $table, $targetTable)
@@ -278,64 +145,75 @@ class Impala extends Writer implements WriterInterface
             $this->create($destinationTable);
         }
 
-        $columns = array_map(function ($item) {
-            if (strtolower($item['type']) != 'ignore') {
-                return $this->escape($item['dbName']);
-            }
-        }, $table['items']);
-
-        if (!empty($table['primaryKey'])) {
-            // update data
-            $joinClauseArr = [];
-            foreach ($table['primaryKey'] as $index => $value) {
-                $joinClauseArr[] = "a.{$value}=b.{$value}";
-            }
-            $joinClause = implode(' AND ', $joinClauseArr);
-
-            $valuesClauseArr = [];
-            foreach ($columns as $index => $column) {
-                $valuesClauseArr[] = "a.{$column}=b.{$column}";
-            }
-            $valuesClause = implode(',', $valuesClauseArr);
-
-            $query = "UPDATE a
-                SET {$valuesClause}
-                FROM {$targetTable} a
-                INNER JOIN {$sourceTable} b ON {$joinClause}
-            ";
-
-            $this->execQuery($query);
-
-            // delete updated from temp table
-            $query = "DELETE a FROM {$sourceTable} a
-                INNER JOIN {$targetTable} b ON {$joinClause}
-            ";
-
-            $this->execQuery($query);
-        }
-
-        // insert new data
-        $columnsClause = implode(',', $columns);
-        $query = "INSERT INTO {$targetTable} ({$columnsClause}) SELECT * FROM {$sourceTable}";
+        // insert data
+        $query = "INSERT OVERWRITE {$targetTable} SELECT * FROM {$sourceTable}";
         $this->execQuery($query);
 
         // drop temp table
         $this->drop($sourceTable);
     }
 
-    private function tableExists($tableName)
+    public function tableExists($tableName)
     {
         $tableArr = explode('.', $tableName);
         $tableName = isset($tableArr[1])?$tableArr[1]:$tableArr[0];
-        $tableName = str_replace(['[',']'], '', $tableName);
-        $stmt = $this->db->query(sprintf("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '%s'", $tableName));
+        $stmt = $this->db->query(sprintf("SHOW TABLES '%s'", $tableName));
         $res = $stmt->fetchAll();
         return !empty($res);
+    }
+
+    public function isTableValid(array $table, $ignoreExport = false)
+    {
+        // TODO: Implement isTableValid() method.
+
+        return true;
     }
 
     private function execQuery($query)
     {
         $this->logger->info(sprintf("Executing query '%s'", $query));
         $this->db->exec($query);
+    }
+
+    public function showTables($dbName)
+    {
+        // TODO: Implement showTables() method.
+    }
+
+    public function getTableInfo($tableName)
+    {
+        // TODO: Implement getTableInfo() method.
+    }
+
+    private function escape($str)
+    {
+        return sprintf('`%s`', $str);
+    }
+
+    private function escapeSingleQuotes($str)
+    {
+        return preg_replace("/\'/", "\\'", $str);
+    }
+
+    private function getValuesClause($row, $columns)
+    {
+        $res = [];
+        foreach ($row as $index => $value) {
+            if (strtolower($columns[$index]['type']) == 'ignore') {
+                continue;
+            }
+            if (is_numeric($value)) {
+                $res[] = $value;
+                continue;
+            }
+            $type = $columns[$index]['type'];
+            if (null !== $columns[$index]['size']) {
+                $type .= sprintf('(%s)', $columns[$index]['size']);
+            }
+
+            $res[] = sprintf("cast('%s' as %s)", $this->escapeSingleQuotes($value), $type);
+        }
+
+        return implode(',', $res);
     }
 }
