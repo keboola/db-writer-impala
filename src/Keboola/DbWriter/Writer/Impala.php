@@ -135,8 +135,7 @@ class Impala extends Writer implements WriterInterface
 
     public function upsert(array $table, $targetTable)
     {
-        $sourceTable = $this->escape($table['dbName']);
-        $targetTable = $this->escape($targetTable);
+        $sourceTable = $table['dbName'];
 
         // create target table if not exists
         if (!$this->tableExists($targetTable)) {
@@ -145,8 +144,45 @@ class Impala extends Writer implements WriterInterface
             $this->create($destinationTable);
         }
 
-        // insert data
-        $query = "INSERT OVERWRITE {$targetTable} SELECT * FROM {$sourceTable}";
+        $columns = array_map(function ($item) {
+            if (strtolower($item['type']) != 'ignore') {
+                return $this->escape($item['dbName']);
+            }
+        }, $table['items']);
+
+        if (!empty($table['primaryKey'])) {
+            // update data
+            $joinClauseArr = [];
+            foreach ($table['primaryKey'] as $index => $value) {
+                $joinClauseArr[] = "a.{$value}=b.{$value}";
+            }
+            $joinClause = implode(' AND ', $joinClauseArr);
+
+            $valuesClauseArr = [];
+            foreach ($columns as $index => $column) {
+                $valuesClauseArr[] = "a.{$column}=b.{$column}";
+            }
+            $valuesClause = implode(',', $valuesClauseArr);
+
+            $query = "UPDATE a
+                SET {$valuesClause}
+                FROM {$targetTable} a
+                INNER JOIN {$sourceTable} b ON {$joinClause}
+            ";
+
+            $this->execQuery($query);
+
+            // delete updated from temp table
+            $query = "DELETE a FROM {$sourceTable} a
+                INNER JOIN {$targetTable} b ON {$joinClause}
+            ";
+
+            $this->execQuery($query);
+        }
+
+        // insert new data
+        $columnsClause = implode(',', $columns);
+        $query = "INSERT INTO {$targetTable} ({$columnsClause}) SELECT * FROM {$sourceTable}";
         $this->execQuery($query);
 
         // drop temp table
@@ -157,9 +193,14 @@ class Impala extends Writer implements WriterInterface
     {
         $tableArr = explode('.', $tableName);
         $tableName = isset($tableArr[1])?$tableArr[1]:$tableArr[0];
-        $stmt = $this->db->query(sprintf("SHOW TABLES '%s'", $tableName));
-        $res = $stmt->fetchAll();
-        return !empty($res);
+
+        try {
+            $stmt = $this->db->query(sprintf("SELECT * FROM %s LIMIT 1", $this->escape($tableName)));
+        } catch (\PDOException $e) {
+            return false;
+        }
+
+        return true;
     }
 
     public function isTableValid(array $table, $ignoreExport = false)
