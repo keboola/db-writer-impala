@@ -12,12 +12,13 @@ Writes data to Cloudera Impala Database.
 
 ```json
     {
-      "db": {        
+      "db": {
         "host": "HOST",
         "port": "PORT",
         "database": "DATABASE",
         "user": "USERNAME",
         "password": "PASSWORD",
+        "auth_mech": 3,
         "ssh": {
           "enabled": true,
           "keys": {
