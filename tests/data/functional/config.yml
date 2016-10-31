@@ -1,0 +1,60 @@
+parameters:
+    db:
+        driver: impala
+        host: impala
+        port: 21050
+        database: default
+        user: root
+        password:
+        auth_mech: 0
+
+    tables:
+        -
+            tableId: simple
+            dbName: simple
+            export: true
+            incremental: false
+            primaryKey: [id]
+            items:
+                -
+                    name: id
+                    dbName: id
+                    type: int
+                    size:
+                    nullable:
+                    default:
+                -
+                    name: name
+                    dbName: name
+                    type: varchar
+                    size: 255
+                    nullable:
+                    default:
+                -
+                    name: glasses
+                    dbName: glasses
+                    type: varchar
+                    size: 255
+                    nullable:
+                    default:
+
+        -
+            tableId: special
+            dbName: special
+            export: true
+            incremental: false
+            items:
+                -
+                    name: col1
+                    dbName: col1
+                    type: varchar
+                    size: 255
+                    nullable:
+                    default:
+                -
+                    name: col2
+                    dbName: col2
+                    type: varchar
+                    size: 255
+                    nullable:
+                    default:

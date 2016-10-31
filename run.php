@@ -3,6 +3,7 @@
 use Keboola\DbWriter\Application;
 use Keboola\DbWriter\Exception\ApplicationException;
 use Keboola\DbWriter\Exception\UserException;
+use Keboola\DbWriter\Impala\Configuration\ConfigDefinition;
 use Keboola\DbWriter\Logger;
 use Symfony\Component\Yaml\Yaml;
 
@@ -20,9 +21,10 @@ try {
     }
     $config = Yaml::parse(file_get_contents($arguments["data"] . "/config.yml"));
     $config['parameters']['data_dir'] = $arguments['data'];
-    $config['parameters']['writer_class'] = 'MSSQL';
+    $config['parameters']['writer_class'] = 'Impala';
 
-    $app = new Application($config);
+    $app = new Application($config, $logger, new ConfigDefinition());
+
     echo json_encode($app->run());
 } catch (UserException $e) {
     $logger->log('error', $e->getMessage(), (array) $e->getData());

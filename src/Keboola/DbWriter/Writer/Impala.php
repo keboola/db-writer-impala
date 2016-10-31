@@ -9,6 +9,7 @@
 namespace Keboola\DbWriter\Writer;
 
 use Keboola\Csv\CsvFile;
+use Keboola\DbWriter\Exception\ApplicationException;
 use Keboola\DbWriter\Exception\UserException;
 use Keboola\DbWriter\Logger;
 use Keboola\DbWriter\Writer;
@@ -43,10 +44,14 @@ class Impala extends Writer implements WriterInterface
 
     public function createConnection($dbParams)
     {
+        if (array_key_exists('password', $dbParams) && !array_key_exists('#password', $dbParams)) {
+            $dbParams['#password'] = $dbParams['password'];
+        }
+
         // check params
-        foreach (['host', 'database', 'user', '#password'] as $r) {
-            if (!isset($dbParams[$r])) {
-                throw new UserException(sprintf("Parameter %s is missing.", $r));
+        foreach (['host', 'database', 'user', '#password'] as $param) {
+            if (!array_key_exists($param, $dbParams)) {
+                throw new UserException(sprintf("Parameter %s is missing.", $param));
             }
         }
 
@@ -108,85 +113,61 @@ class Impala extends Writer implements WriterInterface
         $this->execQuery($sql);
     }
 
-
     public function write(CsvFile $csv, array $table)
     {
-        // skip the header
-        $csv->next();
+        $header = $csv->getHeader();
+        $headerWithoutIgnored = array_filter($header, function ($column) use ($table) {
+            // skip ignored
+            foreach ($table['items'] as $tableColumn) {
+                if ($tableColumn['name'] === $column && strtolower($tableColumn['type']) === 'ignore') {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        $columns = array_filter($table['items'], function ($item) {
+            return strtolower($item['type']) !== 'ignore';
+        });
+
+        $columnNames = array_map(function ($item) {
+            return $this->escape($item['dbName']);
+        }, $columns);
+
         $csv->next();
 
         $columnsCount = count($csv->current());
-        $rowsPerInsert = intval((1000 / $columnsCount) - 1);
+        $rowsPerInsert = intval((3000 / $columnsCount) - 1);
 
         while ($csv->current() !== false) {
-            $sql = sprintf('INSERT INTO %s VALUES ', $this->escape($table['dbName']));
+            $sql = sprintf(
+                'INSERT INTO %s (%s) VALUES',
+                $this->escape($table['dbName']),
+                implode(',', $columnNames)
+            ) . PHP_EOL;
 
             for ($i=0; $i<$rowsPerInsert && $csv->current() !== false; $i++) {
-                $sql .= sprintf("(%s),", $this->getValuesClause($csv->current(), $table['items']));
+                $sql .= sprintf(
+                    "(%s),",
+                    $this->getValuesClause(
+                        array_combine($header, $csv->current()),
+                        $columns
+                    )
+                );
                 $csv->next();
             }
             // ditch the last coma
             $sql = substr($sql, 0, -1);
 
             var_dump($sql);
-            $this->db->exec($sql);
+            $this->execQuery($sql);
         }
     }
 
     public function upsert(array $table, $targetTable)
     {
-        $sourceTable = $table['dbName'];
-
-        // create target table if not exists
-        if (!$this->tableExists($targetTable)) {
-            $destinationTable = $table;
-            $destinationTable['dbName'] = $targetTable;
-            $this->create($destinationTable);
-        }
-
-        $columns = array_map(function ($item) {
-            if (strtolower($item['type']) != 'ignore') {
-                return $this->escape($item['dbName']);
-            }
-        }, $table['items']);
-
-        if (!empty($table['primaryKey'])) {
-            // update data
-            $joinClauseArr = [];
-            foreach ($table['primaryKey'] as $index => $value) {
-                $joinClauseArr[] = "a.{$value}=b.{$value}";
-            }
-            $joinClause = implode(' AND ', $joinClauseArr);
-
-            $valuesClauseArr = [];
-            foreach ($columns as $index => $column) {
-                $valuesClauseArr[] = "a.{$column}=b.{$column}";
-            }
-            $valuesClause = implode(',', $valuesClauseArr);
-
-            $query = "UPDATE a
-                SET {$valuesClause}
-                FROM {$targetTable} a
-                INNER JOIN {$sourceTable} b ON {$joinClause}
-            ";
-
-            $this->execQuery($query);
-
-            // delete updated from temp table
-            $query = "DELETE a FROM {$sourceTable} a
-                INNER JOIN {$targetTable} b ON {$joinClause}
-            ";
-
-            $this->execQuery($query);
-        }
-
-        // insert new data
-        $columnsClause = implode(',', $columns);
-        $query = "INSERT INTO {$targetTable} ({$columnsClause}) SELECT * FROM {$sourceTable}";
-        $this->execQuery($query);
-
-        // drop temp table
-        $this->drop($sourceTable);
+        throw new ApplicationException("Incremental write is not supported.");
     }
 
     public function tableExists($tableName)
@@ -226,6 +207,11 @@ class Impala extends Writer implements WriterInterface
         // TODO: Implement getTableInfo() method.
     }
 
+    public function testConnection()
+    {
+        $this->db->query('SHOW TABLES')->execute();
+    }
+
     private function escape($str)
     {
         return sprintf('`%s`', $str);
@@ -239,20 +225,22 @@ class Impala extends Writer implements WriterInterface
     private function getValuesClause($row, $columns)
     {
         $res = [];
-        foreach ($row as $index => $value) {
-            if (strtolower($columns[$index]['type']) == 'ignore') {
-                continue;
-            }
-            if (is_numeric($value)) {
-                $res[] = $value;
-                continue;
-            }
-            $type = $columns[$index]['type'];
-            if (null !== $columns[$index]['size']) {
-                $type .= sprintf('(%s)', $columns[$index]['size']);
-            }
+        foreach ($row as $key => $value) {
+            foreach ($columns as $column) {
+                if ($column['name'] == $key && strtolower($column['type']) !== 'ignore') {
+                    if (is_numeric($value)) {
+                        $res[] = $value;
+                        continue;
+                    }
 
-            $res[] = sprintf("cast('%s' as %s)", $this->escapeSingleQuotes($value), $type);
+                    $type = $column['type'];
+                    if (null !== $column['size']) {
+                        $type .= sprintf('(%s)', $column['size']);
+                    }
+
+                    $res[] = sprintf("cast('%s' as %s)", $this->escapeSingleQuotes($value), $type);
+                }
+            }
         }
 
         return implode(',', $res);
