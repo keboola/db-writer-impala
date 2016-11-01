@@ -46,7 +46,7 @@ class ConfigDefinition implements ConfigurationInterface
                         ->end()
                         ->scalarNode('password')->end()
                         ->scalarNode('#password')->end()
-                        ->integerNode('auth_mech')
+                        ->scalarNode('auth_mech')
                             ->defaultValue(3)
                         ->end()
                         ->append($this->addSshNode())
