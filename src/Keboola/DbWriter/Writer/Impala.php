@@ -61,6 +61,10 @@ class Impala extends Writer implements WriterInterface
             \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC
         ];
 
+        if (isset($dbParams['auth_mech']) && $dbParams['auth_mech'] == 0) {
+            $dbParams['#password'] = "";
+        }
+
         $port = isset($dbParams['port']) ? $dbParams['port'] : '21050';
         $dsn = sprintf(
             "odbc:DSN=MyImpala;HOST=%s;PORT=%s;Database=%s;UID=%s;PWD=%s;AuthMech=%s",
