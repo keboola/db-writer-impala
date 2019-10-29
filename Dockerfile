@@ -8,6 +8,7 @@ RUN rpm -Uvh https://mirror.webtatic.com/yum/el7/epel-release.rpm && \
 	yum -y --enablerepo=epel,remi,remi-php73 install \
 		epel-release \
 		git \
+		unzip \
 		php \
 		php-cli \
 		php-common \
