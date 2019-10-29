@@ -1,0 +1,75 @@
+{
+    "parameters": {
+        "db": {
+            "driver": "impala",
+            "host": "impala",
+            "port": 21050,
+            "database": "default",
+            "user": "root",
+            "password": null,
+            "auth_mech": 0
+        },
+        "tables": [
+        {
+            "tableId": "simple",
+            "dbName": "simple",
+            "export": 1,
+            "lastChange": null,
+            "incremental": true,
+            "primaryKey": [
+                "id"
+            ],
+            "items": [
+            {
+                "name": "id",
+                "dbName": "id",
+                "type": "int",
+                "size": null,
+                "nullable": null,
+                "default": null
+            },
+            {
+                "name": "name",
+                "dbName": "name",
+                "type": "varchar",
+                "size": 255,
+                "nullable": null,
+                "default": null
+            },
+            {
+                "name": "glasses",
+                "dbName": "glasses",
+                "type": "varchar",
+                "size": 255,
+                "nullable": null,
+                "default": null
+            }
+            ]
+        },
+        {
+            "tableId": "special",
+            "dbName": "special",
+            "export": 1,
+            "lastChange": null,
+            "items": [
+            {
+                "name": "col1",
+                "dbName": "col1",
+                "type": "varchar",
+                "size": 255,
+                "nullable": null,
+                "default": null
+            },
+            {
+                "name": "col2",
+                "dbName": "col2",
+                "type": "varchar",
+                "size": 255,
+                "nullable": null,
+                "default": null
+            }
+            ]
+        }
+        ]
+    }
+}

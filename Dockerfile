@@ -1,16 +1,31 @@
-#VERSION 1.0.0
-FROM keboola/base-php56
-MAINTAINER Miro Cillik <miro@keboola.com>
+FROM centos:centos7
 
-# Install dependencies
-RUN yum -y --enablerepo=epel,remi,remi-php56 install php-devel
-RUN yum -y --enablerepo=epel,remi,remi-php56 install php-odbc
+# Image setup
+WORKDIR /tmp
+RUN rpm -Uvh https://mirror.webtatic.com/yum/el7/epel-release.rpm && \
+	rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm && \
+	yum -y --enablerepo=epel,remi,remi-php73 upgrade && \
+	yum -y --enablerepo=epel,remi,remi-php73 install \
+		epel-release \
+		git \
+		php \
+		php-cli \
+		php-common \
+		php-mbstring \
+		php-pdo \
+		php-xml \
+		php-devel \
+		php-odbc \
+		&& \
+	yum clean all && \
+	echo "date.timezone=UTC" >> /etc/php.ini && \
+	echo "memory_limit = -1" >> /etc/php.ini && \
+	curl -sS https://getcomposer.org/installer | php && \
+	mv composer.phar /usr/local/bin/composer
 
 ## Cloudera Impala
-RUN yum -y install unixODBC
-RUN yum -y install cyrus-sasl-gssapi
-RUN yum -y install cyrus-sasl-plain
-ADD driver/ClouderaImpalaODBC-2.5.30.1011-1.el6.x86_64.rpm /tmp/ClouderaImpalaODBC-2.5.30.1011-1.el6.x86_64.rpm
+RUN yum -y install unixODBC cyrus-sasl-gssapi cyrus-sasl-plain
+ADD driver/ClouderaImpalaODBC-2.6.7.1007-1.x86_64.rpm /tmp/ClouderaImpalaODBC-2.5.30.1011-1.el6.x86_64.rpm
 RUN ln  -s  /usr/lib64/libsasl2.so.3  /usr/lib64/libsasl2.so.2
 RUN rpm -ivh ClouderaImpalaODBC* --nodeps
 
@@ -30,4 +45,4 @@ WORKDIR /code
 RUN echo "memory_limit = -1" >> /etc/php.ini
 RUN composer install --no-interaction
 
-ENTRYPOINT php ./run.php --data=/data
+CMD php ./src/run.php --data=/data

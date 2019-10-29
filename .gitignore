@@ -6,3 +6,4 @@ tests/data/out/
 composer.phar
 runtests.sh
 test.php
+.phpunit.result.cache
