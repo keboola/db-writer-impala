@@ -6,7 +6,7 @@ services:
 script:
   - docker-compose -v
   - docker-compose build
-  - docker-compose run app
+  - docker-compose run app composer ci
 
 notifications:
   slack: $SLACK_INTEGRATION_DOMAIN:$SLACK_INTEGRATION_KEY
