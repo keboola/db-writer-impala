@@ -31,7 +31,7 @@
         }
     },
     "scripts": {
-        "tests": "phpunit",
+        "tests": "sleep 60; phpunit",
         "phpcs": "phpcs -n --ignore=vendor --extensions=php .",
         "phpstan": "phpstan analyse --no-progress --level=max src tests -c phpstan.neon",
         "phpcbf": "phpcbf -n --ignore=vendor --extensions=php .",
