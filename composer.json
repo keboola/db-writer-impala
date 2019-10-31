@@ -22,7 +22,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Keboola\\": "src/Keboola/"
+            "Keboola\\DbWriter\\": "src/Keboola/"
         }
     },
     "autoload-dev": {
