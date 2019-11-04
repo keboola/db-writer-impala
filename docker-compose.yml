@@ -1,21 +1,27 @@
-app:
-  build: .
-  volumes:
-      - .:/code
-  working_dir: /code
-  entrypoint: "./phpunit.sh"
-  tty: true
-  stdin_open: true
-  environment:
-    - IMPALA_DB_HOST=impala
-    - IMPALA_DB_PORT=21050
-    - IMPALA_DB_DATABASE=default
-    - IMPALA_DB_USER=root
-    - IMPALA_DB_PASSWORD=
-  links:
-    - impala
+version: '2'
 
-impala:
-  image: quay.io/keboola/impala-docker
-  ports:
-    - "21050:21050"
+services:
+  app: &main
+    image: keboola/db-writer-impala
+    build: .
+    working_dir: /code
+    tty: true
+    stdin_open: true
+    environment:
+      - DB_HOST=impala
+      - DB_PORT=21050
+      - DB_DATABASE=default
+      - DB_USER=root
+      - DB_PASSWORD=
+    links:
+      - impala
+  dev:
+    <<: *main
+    image: keboola/db-writer-impala-dev
+    volumes:
+      - .:/code
+
+  impala:
+    image: quay.io/keboola/impala-docker
+    ports:
+      - "21050:21050"
