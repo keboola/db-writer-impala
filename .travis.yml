@@ -8,5 +8,12 @@ script:
   - docker-compose build
   - docker-compose run app composer ci
 
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: ./deploy.sh
+  on:
+    tags: true
+
 notifications:
   slack: $SLACK_INTEGRATION_DOMAIN:$SLACK_INTEGRATION_KEY
