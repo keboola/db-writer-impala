@@ -16,7 +16,7 @@ class ImpalaActionConfigRowDefinition implements ConfigurationInterface
         $rootNode = $treeBuilder->getRootNode();
 
         $rootNode
-            ->ignoreExtraKeys()
+            ->ignoreExtraKeys(false)
             ->children()
                 ->scalarNode('data_dir')
                     ->isRequired()
