@@ -17,7 +17,7 @@ class BaseFunctionalTest extends BaseTest
         $command = 'php ' . $this->rootDir . 'run.php --data=' . $this->rootDir . 'tests/data/functional 2>&1';
         $process = new Process($command);
         $process->run();
-        $this->assertEquals(0, $process->getExitCode());
+        $this->assertEquals(0, $process->getExitCode(), $process->getErrorOutput());
     }
 
     public function testTestConnection(): void
@@ -32,7 +32,7 @@ class BaseFunctionalTest extends BaseTest
         $process = new Process($commnand);
         $process->run();
 
-        $this->assertEquals(0, $process->getExitCode());
+        $this->assertEquals(0, $process->getExitCode(), $process->getErrorOutput());
 
         $data = json_decode($process->getOutput(), true);
 
