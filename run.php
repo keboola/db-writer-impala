@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-use Keboola\DbWriter\Application;
 use Keboola\DbWriter\Exception\ApplicationException;
 use Keboola\DbWriter\Exception\UserException;
-use Keboola\DbWriter\Impala\Configuration\ConfigDefinition;
 use Keboola\DbWriter\Logger;
-use Symfony\Component\Yaml\Yaml;
+use Keboola\DbWriter\ImpalaApplication;
 
 define('APP_NAME', 'wr-db-impala');
 define('ROOT_PATH', __DIR__);
@@ -25,7 +23,7 @@ try {
     $config['parameters']['data_dir'] = $arguments['data'];
     $config['parameters']['writer_class'] = 'Impala';
 
-    $app = new Application($config, $logger, new ConfigDefinition());
+    $app = new ImpalaApplication($config, $logger);
 
     echo $app->run();
 } catch (UserException $e) {
