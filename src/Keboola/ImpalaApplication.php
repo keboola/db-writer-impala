@@ -12,7 +12,7 @@ class ImpalaApplication extends Application
 {
     public function __construct(array $config, Logger $logger)
     {
-        $action = !is_null($config['action']) ?: 'run';
+        $action = $config['action'] ?? 'run';
         if (isset($config['parameters']['tables'])) {
             $configDefinition = new ImpalaConfigDefinition();
         } else {
