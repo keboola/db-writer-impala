@@ -74,3 +74,7 @@ App is developed on localhost using TDD.
 2. Change directory: `cd db-writer-impala`
 3. Install dependencies: `composer install --no-interaction`
 4. Run docker-compose, which will trigger phpunit: `docker-compose run app`
+
+## License
+
+MIT licensed, see [LICENSE](./LICENSE) file.
