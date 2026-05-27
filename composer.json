@@ -18,7 +18,7 @@
         "keboola/coding-standard": "^9.0",
         "phpstan/phpstan-shim": "^0.11.19",
         "phpunit/phpunit": "^8.4",
-        "symfony/yaml": "^4.3"
+        "symfony/yaml": "^5.4"
     },
     "autoload": {
         "psr-4": {
